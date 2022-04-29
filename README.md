@@ -1,8 +1,5 @@
 # tube
 
-
-aa
-
 `tube` is a Youtube-like (_without censorship and features you don't need!_)
 Video Sharing App written in Go which also supports automatic transcoding to
 MP4 H.265 AAC, multiple collections and RSS feed.
@@ -52,6 +49,11 @@ Open http://127.0.0.1:8000/ in your Browser!
 $ docker pull prologic/tube
 $ docker run -p 8000:8000 -v /path/to/data:/data
 ```
+
+or using makefile:
+
+``` make docker-run ```
+
 
 Open http://DOCKER_MACHINE_IP:8000/ in your Browser!
 
