@@ -64,6 +64,7 @@ ENV GODEBUG=netdns=cgo
 COPY --from=build /src/tube /usr/local/bin/tube
 
 COPY .dockerfiles/entrypoint.sh /init
+COPY .dockerfiles/config.json /
 
 ENTRYPOINT ["/init"]
 CMD ["tube"]
