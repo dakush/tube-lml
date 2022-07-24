@@ -306,7 +306,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			"-vframes", "1",
 			"-strict", "-2",
 			"-loglevel", "quiet",
-			tf.Name(),
+			thumbFn1,
 		); err != nil {
 			err := fmt.Errorf("error generating thumbnail: %w", err)
 			log.Error(err)
