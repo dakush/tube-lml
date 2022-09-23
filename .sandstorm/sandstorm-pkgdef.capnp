@@ -21,7 +21,7 @@ const pkgdef :Spk.PackageDefinition = (
 
     appVersion = 0,  # Increment this for every release.
 
-    appMarketingVersion = (defaultText = "0.0.0"),
+    appMarketingVersion = (defaultText = "0.0.1"),
     # Human-readable representation of appVersion. Should match the way you
     # identify versions of your app in documentation and marketing.
 
@@ -55,58 +55,26 @@ const pkgdef :Spk.PackageDefinition = (
       license = (openSource = mit),
 
       categories = [media],
-      # A list of categories/genres to which this app belongs, sorted with best fit first.
-      # See the list of categories at
-      # https://docs.sandstorm.io/en/latest/developing/publishing-apps/#categories
 
       author = (
         contactEmail = "inbox@jacobweisz.com",
 
-        #pgpSignature = embed "path/to/pgp-signature",
-        # PGP signature attesting responsibility for the app ID. This is a binary-format detached
-        # signature of the following ASCII message (not including the quotes, no newlines, and
-        # replacing <app-id> with the standard base-32 text format of the app's ID):
-        #
-        # "I am the author of the Sandstorm.io app with the following ID: <app-id>"
-        #
-        # You can create a signature file using `gpg` like so:
-        #
-        #     echo -n "I am the author of the Sandstorm.io app with the following ID: <app-id>" | gpg --sign > pgp-signature
-        #
-        # Further details including how to set up GPG and how to use keybase.io can be found
-        # at https://docs.sandstorm.io/en/latest/developing/publishing-apps/#verify-your-identity
+        pgpSignature = embed "pgp-signature",
 
         upstreamAuthor = "James Mills",
       ),
 
-      #pgpKeyring = embed "path/to/pgp-keyring",
-      # A keyring in GPG keyring format containing all public keys needed to verify PGP signatures in
-      # this manifest (as of this writing, there is only one: `author.pgpSignature`).
-      #
-      # To generate a keyring containing just your public key, do:
-      #
-      #     gpg --export <key-id> > keyring
-      #
-      # Where `<key-id>` is a PGP key ID or email address associated with the key.
+      pgpKeyring = embed "pgp-keyring",
 
-      #description = (defaultText = embed "path/to/description.md"),
-      # The app's description in Github-flavored Markdown format, to be displayed e.g.
-      # in an app store. Note that the Markdown is not permitted to contain HTML nor image tags (but
-      # you can include a list of screenshots separately).
+      description = (defaultText = embed "DESCRIPTION.md"),
 
-      shortDescription = (defaultText = "one-to-three words"),
-      # A very short (one-to-three words) description of what the app does. For example,
-      # "Document editor", or "Notetaking", or "Email client". This will be displayed under the app
-      # title in the grid view in the app market.
+      shortDescription = (defaultText = "Simple video sharing"),
 
       screenshots = [
         (width = 2624, height = 1624, png = embed "../screenshot-1.png"),
         (width = 2624, height = 1624, png = embed "../screenshot-2.png"),
       ],
-      #changeLog = (defaultText = embed "path/to/sandstorm-specific/changelog.md"),
-      # Documents the history of changes in Github-flavored markdown format (with the same restrictions
-      # as govern `description`). We recommend formatting this with an H1 heading for each version
-      # followed by a bullet list of changes.
+      changeLog = (defaultText = embed "../CHANGELOG.md"),
     ),
   ),
 
