@@ -97,7 +97,7 @@ func NewApp(cfg *Config) (*App, error) {
 
 	// Setup Router
 	authPassword := os.Getenv("auth_password")
-	isSandstorm := os.Getenv("sandstorm")
+	isSandstorm := os.Getenv("SANDSTORM")
 
 	r := mux.NewRouter().StrictSlash(true)
 	r.HandleFunc("/", a.indexHandler).Methods("GET", "OPTIONS")
