@@ -101,7 +101,11 @@ func NewApp(cfg *Config) (*App, error) {
 
 	r := mux.NewRouter().StrictSlash(true)
 	r.HandleFunc("/", a.indexHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/upload", middleware.OptionallyRequireAdminAuth(middleware.RequireSandstormUploadPermission(a.uploadHandler, isSandstorm), authPassword)).Methods("GET", "OPTIONS", "POST")
+	if isSandstorm == "1" {
+		r.HandleFunc("/upload", middleware.RequireSandstormPermission(a.uploadHandler, "upload")).Methods("GET", "OPTIONS", "POST")
+	} else {
+		r.HandleFunc("/upload", middleware.OptionallyRequireAdminAuth(a.uploadHandler, authPassword)).Methods("GET", "OPTIONS", "POST")
+	}
 	r.HandleFunc("/import", a.importHandler).Methods("GET", "OPTIONS", "POST")
 	r.HandleFunc("/v/{id}.mp4", a.videoHandler).Methods("GET")
 	r.HandleFunc("/v/{prefix}/{id}.mp4", a.videoHandler).Methods("GET")

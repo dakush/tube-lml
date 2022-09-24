@@ -50,16 +50,11 @@ func OptionallyRequireAdminAuth(handler http.HandlerFunc, password string) http.
 	}
 }
 
-func RequireSandstormUploadPermission(handler http.HandlerFunc, isSandstorm string) http.HandlerFunc {
+func RequireSandstormPermission(handler http.HandlerFunc, permissionNeeded string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		//If isSandstorm is not "1", we are not in Sandstorm.
-		if isSandstorm != "1" {
-			handler(w, r)
-			return
-		}
 		
 		// Failed
-		if !strings.Contains(r.Header.Get("X-Sandstorm-Permissions"), "upload") {
+		if !strings.Contains(r.Header.Get("X-Sandstorm-Permissions"), permissionNeeded) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			log.Debugln("No upload capability granted")
 			return
