@@ -147,7 +147,7 @@ func NewApp(cfg *Config) (*App, error) {
 func (a *App) Run() error {
 	for _, pc := range a.Config.Library {
 		p := &media.Path{
-			Path:   pc.Path,
+			Path:   filepath.Clean(pc.Path),
 			Prefix: pc.Prefix,
 		}
 		err := a.Library.AddPath(p)

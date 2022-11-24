@@ -32,7 +32,6 @@ func NewLibrary() *Library {
 func (lib *Library) AddPath(p *Path) error {
 	lib.mu.Lock()
 	defer lib.mu.Unlock()
-	p.Path = filepath.Clean(p.Path)
 	// make sure new path doesn't collide with existing ones
 	for _, p2 := range lib.Paths {
 		if p.Path == p2.Path {
