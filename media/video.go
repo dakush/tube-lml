@@ -31,7 +31,7 @@ type Video struct {
 	Views int64
 }
 
-func GetTagsFromYml(v *Video) error {
+func getTagsFromYml(v *Video) error {
 	ymlFileName := fmt.Sprintf("%s.yml", strings.TrimSuffix(v.Path, filepath.Ext(v.Path)))
 	if !utils.FileExists(ymlFileName) {
 		return nil
@@ -96,7 +96,7 @@ func ParseVideo(p *Path, name string) (*Video, error) {
 		Timestamp:   timestamp,
 	}
 	// read yml if exists
-	err = GetTagsFromYml(v)
+	err = getTagsFromYml(v)
 	if err != nil {
 		log.Println("Failed to read yml for", v.Path)
 	}
