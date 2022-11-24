@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-	"github.com/dhowden/tag"
 	"git.mills.io/prologic/tube/utils"
+	"github.com/dhowden/tag"
+	"gopkg.in/yaml.v3"
 )
 
 // Video represents metadata for a single video.
@@ -31,24 +31,24 @@ type Video struct {
 	Views int64
 }
 
-func GetTagsFromYml(p *Path, filename string, v *Video) (*Video, error) {
+func GetTagsFromYml(v *Video) error {
 	ymlFileName := fmt.Sprintf("%s.yml", strings.TrimSuffix(v.Path, filepath.Ext(v.Path)))
-	if ! utils.FileExists(ymlFileName) {
-		return v, nil
+	if !utils.FileExists(ymlFileName) {
+		return nil
 	}
 
 	ymlFile, err := ioutil.ReadFile(ymlFileName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	err = yaml.Unmarshal(ymlFile, v)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	log.Println("Got tags from yml for", v.Path)
-	return v, nil
+	return nil
 }
 
 // ParseVideo parses a video file's metadata and returns a Video.
@@ -96,7 +96,7 @@ func ParseVideo(p *Path, name string) (*Video, error) {
 		Timestamp:   timestamp,
 	}
 	// read yml if exists
-	_, err = GetTagsFromYml(p, name, v)
+	err = GetTagsFromYml(v)
 	if err != nil {
 		log.Println("Failed to read yml for", v.Path)
 	}
