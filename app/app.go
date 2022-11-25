@@ -236,11 +236,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		title := r.FormValue("video_title")
 		description := r.FormValue("video_description")
-		targetLibraryPath := r.FormValue("target_library_path")
-
-		if _, exists := a.Library.Paths[targetLibraryPath]; exists {
-			targetLibraryPath = r.FormValue("target_library_path")
-		} else {
+		if targetLibraryPath, exists := a.Library.Paths[r.FormValue("target_library_path")]; !exists {
 			err := fmt.Errorf("uploading to invalid library path : %s", targetLibraryPath)
 			log.Error(err)
 			return
