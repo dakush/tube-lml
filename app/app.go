@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -211,6 +212,13 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func sanitizedBaseFilename(uploadFilename string) (string) {
+	fileNameWithoutExtension := uploadFilename[0:len(uploadFilename)-len(filepath.Ext(uploadFilename))]
+	forbiddenCharacterMatcher := regexp.MustCompile("[^a-zA-Z0-9_-]") // "^"inverse class. matches everything else.
+	sanFN := forbiddenCharacterMatcher.ReplaceAllString(fileNameWithoutExtension, "_")
+	return sanFN
+}
+
 // HTTP handler for /upload
 func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -274,9 +282,10 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+
 		vf := filepath.Join(
 			a.Library.Paths[targetLibraryPath].Path,
-			fmt.Sprintf("%s.mp4", shortuuid.New()),
+			fmt.Sprintf("%s_%s.mp4", sanitizedBaseFilename(handler.Filename), shortuuid.New()),
 		)
 		thumbFn1 := fmt.Sprintf("%s.jpg", strings.TrimSuffix(tf.Name(), filepath.Ext(tf.Name())))
 		thumbFn2 := fmt.Sprintf("%s.jpg", strings.TrimSuffix(vf, filepath.Ext(vf)))
