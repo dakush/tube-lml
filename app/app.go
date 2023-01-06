@@ -290,6 +290,11 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("%s.mp4", sanitizedBaseFilename(handler.Filename)),
 		)
 		for _, err := os.Stat(vf) ; ! os.IsNotExist(err) ; _, err = os.Stat(vf) {
+			if err != nil {
+				log.Error(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			log.Warn("File '"+ vf + "' already exists.");
 			vf = filepath.Join(
 				a.Library.Paths[targetLibraryPath].Path,
