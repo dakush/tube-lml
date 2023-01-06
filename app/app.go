@@ -214,7 +214,7 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func sanitizedBaseFilename(uploadFilename string) (string) {
 	fileNameWithoutExtension := uploadFilename[0:len(uploadFilename)-len(filepath.Ext(uploadFilename))]
-	forbiddenCharacterMatcher := regexp.MustCompile("[^a-zA-Z0-9_-]") // "^"inverse class. matches everything else.
+	forbiddenCharacterMatcher := regexp.MustCompile("[^a-zA-Z0-9.,_+-]") // "^"inverse class. matches everything else.
 	sanFN := forbiddenCharacterMatcher.ReplaceAllString(fileNameWithoutExtension, "_")
 	return sanFN
 }
