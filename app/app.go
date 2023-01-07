@@ -223,8 +223,8 @@ func filenameWithoutExtension(path string) (stem string) {
 }
 
 // HTTP handler for /upload
-func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
+func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Request) {
+	if request.Method == "GET" {
 		ctx := &struct {
 			Config  *Config
 			Playing *media.Video
@@ -232,27 +232,27 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			Config:  a.Config,
 			Playing: &media.Video{ID: ""},
 		}
-		a.render("upload", w, ctx)
-	} else if r.Method == "POST" {
-		r.ParseMultipartForm(a.Config.Server.MaxUploadSize)
+		a.render("upload", respWriter, ctx)
+	} else if request.Method == "POST" {
+		request.ParseMultipartForm(a.Config.Server.MaxUploadSize)
 
-		file, handler, err := r.FormFile("video_file")
+		file, handler, err := request.FormFile("video_file")
 		if err != nil {
 			err := fmt.Errorf("error processing form: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer file.Close()
 
-		title := r.FormValue("video_title")
-		description := r.FormValue("video_description")
-		if _, exists := a.Library.Paths[r.FormValue("target_library_path")]; !exists {
-			err := fmt.Errorf("uploading to invalid library path: %s", r.FormValue("target_library_path"))
+		title := request.FormValue("video_title")
+		description := request.FormValue("video_description")
+		if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
+			err := fmt.Errorf("uploading to invalid library path: %s", request.FormValue("target_library_path"))
 			log.Error(err)
 			return
 		}
-		targetLibraryPath := r.FormValue("target_library_path")
+		targetLibraryPath := request.FormValue("target_library_path")
 
 		uf, err := ioutil.TempFile(
 			a.Config.Server.UploadPath,
@@ -261,7 +261,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			err := fmt.Errorf("error creating temporary file for uploading: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer os.Remove(uf.Name())
@@ -270,7 +270,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			err := fmt.Errorf("error writing file: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -281,7 +281,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			err := fmt.Errorf("error creating temporary file for transcoding: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -302,7 +302,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			err := fmt.Errorf("error creating file name in target library: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// If the (sanitized) original filename collides with an existing file,
@@ -310,7 +310,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		for _, err := os.Stat(vf) ; ! os.IsNotExist(err) ; _, err = os.Stat(vf) {
 			if err != nil {
 				log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			log.Warn("File '"+ vf + "' already exists.");
@@ -321,7 +321,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				err := fmt.Errorf("error creating file name in target library: %w", err)
 				log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			log.Warn("Using filename '" + vf + "' instead.");
@@ -347,7 +347,7 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			err := fmt.Errorf("error transcoding video: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -365,21 +365,21 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			err := fmt.Errorf("error generating thumbnail: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if err := os.Rename(thumbFn1, thumbFn2); err != nil {
 			err := fmt.Errorf("error renaming generated thumbnail: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if err := os.Rename(tf.Name(), vf); err != nil {
 			err := fmt.Errorf("error renaming transcoded video: %w", err)
 			log.Error(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -413,14 +413,14 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			); err != nil {
 				err := fmt.Errorf("error transcoding video: %w", err)
 				log.Error(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}
 
-		fmt.Fprintf(w, "Video successfully uploaded!")
+		fmt.Fprintf(respWriter, "Video successfully uploaded!")
 	} else {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		http.Error(respWriter, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
 
