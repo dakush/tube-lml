@@ -236,17 +236,17 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	} else if request.Method == "POST" {
 		request.ParseMultipartForm(a.Config.Server.MaxUploadSize)
 
-		file, handler, err := request.FormFile("video_file")
+		fileFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
 		if err != nil {
 			err := fmt.Errorf("error processing form: %w", err)
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer file.Close()
+		defer fileFromUpload.Close()
 
-		title := request.FormValue("video_title")
-		description := request.FormValue("video_description")
+		videoTitleFromUpload := request.FormValue("video_title")
+		videoDescriptionFromUpload := request.FormValue("video_description")
 		if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
 			err := fmt.Errorf("uploading to invalid library path: %s", request.FormValue("target_library_path"))
 			log.Error(err)
@@ -256,7 +256,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 
 		uf, err := ioutil.TempFile(
 			a.Config.Server.UploadPath,
-			fmt.Sprintf("tube-upload-*%s", filepath.Ext(handler.Filename)),
+			fmt.Sprintf("tube-upload-*%s", filepath.Ext(fileHeaderFromUpload.Filename)),
 		)
 		if err != nil {
 			err := fmt.Errorf("error creating temporary file for uploading: %w", err)
@@ -266,7 +266,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		}
 		defer os.Remove(uf.Name())
 
-		_, err = io.Copy(uf, file)
+		_, err = io.Copy(uf, fileFromUpload)
 		if err != nil {
 			err := fmt.Errorf("error writing file: %w", err)
 			log.Error(err)
@@ -291,7 +291,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		   a.Library.Paths[targetLibraryPath].PreserveUploadFilename {
 			vf, err = securejoin.SecureJoin(
 				a.Library.Paths[targetLibraryPath].Path,
-				fmt.Sprintf("%s.mp4", filenameWithoutExtension(handler.Filename)),
+				fmt.Sprintf("%s.mp4", filenameWithoutExtension(fileHeaderFromUpload.Filename)),
 			)
 		} else {
 			vf, err = securejoin.SecureJoin(
@@ -341,8 +341,8 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			"-acodec", "aac",
 			"-strict", "-2",
 			"-loglevel", "quiet",
-			"-metadata", fmt.Sprintf("title=%s", title),
-			"-metadata", fmt.Sprintf("comment=%s", description),
+			"-metadata", fmt.Sprintf("title=%s", videoTitleFromUpload),
+			"-metadata", fmt.Sprintf("comment=%s", videoDescriptionFromUpload),
 			tf.Name(),
 		); err != nil {
 			err := fmt.Errorf("error transcoding video: %w", err)
@@ -407,8 +407,8 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 				"-crf", "18",
 				"-strict", "-2",
 				"-loglevel", "quiet",
-				"-metadata", fmt.Sprintf("title=%s", title),
-				"-metadata", fmt.Sprintf("comment=%s", description),
+				"-metadata", fmt.Sprintf("title=%s", videoTitleFromUpload),
+				"-metadata", fmt.Sprintf("comment=%s", videoDescriptionFromUpload),
 				sf,
 			); err != nil {
 				err := fmt.Errorf("error transcoding video: %w", err)
