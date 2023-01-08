@@ -283,12 +283,20 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Here we set the final filename for the video file after transcoding.
+		var vf string
+		if a.Config.Server.PreserveUploadFilename {
+			vf = filepath.Join(
+				a.Library.Paths[targetLibraryPath].Path,
+				fmt.Sprintf("%s.mp4", sanitizedBaseFilename(handler.Filename)),
+			)
+		} else {
+			vf = filepath.Join(
+				a.Library.Paths[targetLibraryPath].Path,
+				fmt.Sprintf("%s.mp4", shortuuid.New()),
+			)
+		}
 		// If the (sanitized) original filename collides with an existing file,
 		// we try to add a shortuuid() to it until we find one that doesn't exist.
-		vf := filepath.Join(
-			a.Library.Paths[targetLibraryPath].Path,
-			fmt.Sprintf("%s.mp4", sanitizedBaseFilename(handler.Filename)),
-		)
 		for _, err := os.Stat(vf) ; ! os.IsNotExist(err) ; _, err = os.Stat(vf) {
 			if err != nil {
 				log.Error(err)

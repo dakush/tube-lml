@@ -23,11 +23,12 @@ type PathConfig struct {
 
 // ServerConfig settings for App Server.
 type ServerConfig struct {
-	Host          string `json:"host"`
-	Port          int    `json:"port"`
-	StorePath     string `json:"store_path"`
-	UploadPath    string `json:"upload_path"`
-	MaxUploadSize int64  `json:"max_upload_size"`
+	Host                   string `json:"host"`
+	Port                   int    `json:"port"`
+	StorePath              string `json:"store_path"`
+	UploadPath             string `json:"upload_path"`
+	PreserveUploadFilename bool   `json:"preserve_upload_filename,omitempty"`
+	MaxUploadSize          int64  `json:"max_upload_size"`
 }
 
 // ThumbnailerConfig settings for Transcoder
@@ -77,6 +78,7 @@ func DefaultConfig() *Config {
 			Port:          8000,
 			StorePath:     "tube.db",
 			UploadPath:    "uploads",
+			PreserveUploadFilename: false,
 			MaxUploadSize: 104857600,
 		},
 		Thumbnailer: &ThumbnailerConfig{
