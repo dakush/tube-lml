@@ -149,8 +149,9 @@ func (a *App) Run() error {
 	for _, pc := range a.Config.Library {
 		pc.Path = filepath.Clean(pc.Path)
 		p := &media.Path{
-			Path:   pc.Path,
-			Prefix: pc.Prefix,
+			Path:                   pc.Path,
+			Prefix:                 pc.Prefix,
+			PreserveUploadFilename: pc.PreserveUploadFilename,
 		}
 		err := a.Library.AddPath(p)
 		if err != nil {
@@ -284,7 +285,8 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Here we set the final filename for the video file after transcoding.
 		var vf string
-		if a.Config.Server.PreserveUploadFilename {
+		if a.Config.Server.PreserveUploadFilename ||
+		   a.Library.Paths[targetLibraryPath].PreserveUploadFilename {
 			vf = filepath.Join(
 				a.Library.Paths[targetLibraryPath].Path,
 				fmt.Sprintf("%s.mp4", sanitizedBaseFilename(handler.Filename)),

@@ -17,8 +17,9 @@ type Config struct {
 
 // PathConfig settings for media library path.
 type PathConfig struct {
-	Path   string `json:"path"`
-	Prefix string `json:"prefix"`
+	Path                   string `json:"path"`
+	Prefix                 string `json:"prefix"`
+	PreserveUploadFilename bool   `json:"preserve_upload_filename,omitempty"`
 }
 
 // ServerConfig settings for App Server.
@@ -69,17 +70,18 @@ func DefaultConfig() *Config {
 	return &Config{
 		Library: []*PathConfig{
 			&PathConfig{
-				Path:   "videos",
-				Prefix: "",
+				Path:                   "videos",
+				Prefix:                 "",
+				PreserveUploadFilename: false,
 			},
 		},
 		Server: &ServerConfig{
-			Host:          "0.0.0.0",
-			Port:          8000,
-			StorePath:     "tube.db",
-			UploadPath:    "uploads",
+			Host:                   "0.0.0.0",
+			Port:                   8000,
+			StorePath:              "tube.db",
+			UploadPath:             "uploads",
 			PreserveUploadFilename: false,
-			MaxUploadSize: 104857600,
+			MaxUploadSize:          104857600,
 		},
 		Thumbnailer: &ThumbnailerConfig{
 			Timeout: 60,
