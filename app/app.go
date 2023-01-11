@@ -11,7 +11,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -22,6 +21,7 @@ import (
 	"git.mills.io/prologic/tube/templates"
 	"git.mills.io/prologic/tube/utils"
 
+	"github.com/cyphar/filepath-securejoin"
 	"github.com/dustin/go-humanize"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gorilla/handlers"
@@ -213,11 +213,9 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func sanitizedBaseFilename(uploadFilename string) (string) {
-	fileNameWithoutExtension := uploadFilename[0:len(uploadFilename)-len(filepath.Ext(uploadFilename))]
-	forbiddenCharacterMatcher := regexp.MustCompile("[^a-zA-Z0-9.,_+-]") // "^"inverse class. matches everything else.
-	sanFN := forbiddenCharacterMatcher.ReplaceAllString(fileNameWithoutExtension, "_")
-	return sanFN
+func filenameWithoutExtension(path string) (stem string) {
+	var basename string = filepath.Base(path)
+	return basename[0:len(basename)-len(filepath.Ext(basename))]
 }
 
 // HTTP handler for /upload
@@ -287,15 +285,21 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		var vf string
 		if a.Config.Server.PreserveUploadFilename ||
 		   a.Library.Paths[targetLibraryPath].PreserveUploadFilename {
-			vf = filepath.Join(
+			vf, err = securejoin.SecureJoin(
 				a.Library.Paths[targetLibraryPath].Path,
-				fmt.Sprintf("%s.mp4", sanitizedBaseFilename(handler.Filename)),
+				fmt.Sprintf("%s.mp4", filenameWithoutExtension(handler.Filename)),
 			)
 		} else {
-			vf = filepath.Join(
+			vf, err = securejoin.SecureJoin(
 				a.Library.Paths[targetLibraryPath].Path,
 				fmt.Sprintf("%s.mp4", shortuuid.New()),
 			)
+		}
+		if err != nil {
+			err := fmt.Errorf("error creating file name in target library: %w", err)
+			log.Error(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		// If the (sanitized) original filename collides with an existing file,
 		// we try to add a shortuuid() to it until we find one that doesn't exist.
@@ -306,10 +310,16 @@ func (a *App) uploadHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			log.Warn("File '"+ vf + "' already exists.");
-			vf = filepath.Join(
+			vf, err = securejoin.SecureJoin(
 				a.Library.Paths[targetLibraryPath].Path,
-				fmt.Sprintf("%s_%s.mp4", sanitizedBaseFilename(handler.Filename), shortuuid.New()),
+				fmt.Sprintf("%s_%s.mp4", filenameWithoutExtension(vf), shortuuid.New()),
 			)
+			if err != nil {
+				err := fmt.Errorf("error creating file name in target library: %w", err)
+				log.Error(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			log.Warn("Using filename '" + vf + "' instead.");
 		}
 
