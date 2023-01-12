@@ -96,7 +96,8 @@ Here are some documentation on key configuration items:
     "library": [
         {
             "path": "videos",
-            "prefix": ""
+            "prefix": "",
+            "preserve_upload_filename": false
         }
     ],
 }
@@ -104,6 +105,12 @@ Here are some documentation on key configuration items:
 
 Set `path` to the value of the path where you want to store videos and where
 `tube` will look for new videos.
+If you have more than one location for video files, you can add those, but
+make sure to choose a different `prefix`. The `prefix` will become part of
+the url that points to videos in that location.
+If you set the (optional) `preserve_upload_filename` parameter to `true`,
+tube will try to preserve the filename that was uploaded by the client to
+this location.
 
 ### Server Options / Upload Path and Max Upload Size
 
@@ -114,6 +121,7 @@ Set `path` to the value of the path where you want to store videos and where
         "port": 8000,
         "store_path": "tube.db",
         "upload_path": "uploads",
+        "preserve_upload_filename": false,
         "max_upload_size": 104857600
     }
 }
@@ -129,6 +137,11 @@ Set `path` to the value of the path where you want to store videos and where
 - Set `upload_path` to a directory that you wish to use as a temporary working
   space for `tube` to store uploaded videos and process them. This can be a
   tmpfs file system for example for faster I/O.
+- Set `preserve_upload_filename` parameter to `true` and tube will try to
+  preserve the filename that was transmitted by the client. The default is
+  to give random filenames to uploaded files.
+  If you set it to `true` in the "server" node, it will be active for all
+  library locations.
 - Set `max_upload_size` to the maximum number of bytes you wish to impose on
   uploaded and imported videos. Upload(s)/Import(s) that exceed this size will
   by denied by the server. This is a saftey measure so as to not DoS the

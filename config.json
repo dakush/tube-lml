@@ -2,7 +2,8 @@
     "library": [
         {
             "path": "videos",
-            "prefix": ""
+            "prefix": "",
+            "preserve_upload_filename": false
         }
     ],
     "server": {
