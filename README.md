@@ -103,14 +103,30 @@ Here are some documentation on key configuration items:
 }
 ```
 
-Set `path` to the value of the path where you want to store videos and where
-`tube` will look for new videos.
-If you have more than one location for video files, you can add those, but
-make sure to choose a different `prefix`. The `prefix` will become part of
-the url that points to videos in that location.
-If you set the (optional) `preserve_upload_filename` parameter to `true`,
-tube will try to preserve the filename that was uploaded by the client to
-this location.
+- Set `path` to the value of the path where you want to store videos
+and where `tube` will watch for new video files to show up.
+- Set `prefix` to add a directory component in the video URL.
+- Set the (optional) `preserve_upload_filename` parameter to `true`,
+to to preserve the name of files that are uploaded to this location.
+
+You can add more than one location for video files.
+```#!json
+{
+    "library": [
+        {
+            "path": "/path/to/cat/videos",
+            "prefix": "cats",
+            "preserve_upload_filename": true
+        },
+        {
+            "path": "relative/dog/directory/",
+            "prefix": "dogs"
+        },        
+    ],
+}
+```
+The path will be visible on the upload page and clients can select a
+destination for their uploads. Both `prefix` and `path` need to be unique.
 
 ### Server Options / Upload Path and Max Upload Size
 
