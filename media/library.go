@@ -43,7 +43,7 @@ func (lib *Library) AddPath(p *Path) error {
 	}
 	if _, err := os.Stat(p.Path) ; err != nil && os.IsNotExist(err) {
 		log.Warn(fmt.Sprintf("media: library path '%s' does not exist. Creating it now.", p.Path))
-		if err := os.MkdirAll(p.Path, 0755); err != nil {
+		if err := os.MkdirAll(p.Path, 0o755); err != nil {
 			return fmt.Errorf("error creating library path %s: %w", p.Path, err)
 		}
 	}
