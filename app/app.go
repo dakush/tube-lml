@@ -222,17 +222,22 @@ func filenameWithoutExtension(path string) (stem string) {
 	return basename[0:len(basename)-len(filepath.Ext(basename))]
 }
 
+// Render the upload page where clients can select and upload their video files
+func (a *App) renderUploadPage(respWriter http.ResponseWriter) {
+	ctx := &struct {
+		Config  *Config
+		Playing *media.Video
+	}{
+		Config:  a.Config,
+		Playing: &media.Video{ID: ""},
+	}
+	a.render("upload", respWriter, ctx)
+}
+
 // HTTP handler for /upload
 func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Request) {
 	if request.Method == "GET" {
-		ctx := &struct {
-			Config  *Config
-			Playing *media.Video
-		}{
-			Config:  a.Config,
-			Playing: &media.Video{ID: ""},
-		}
-		a.render("upload", respWriter, ctx)
+		a.renderUploadPage(respWriter)
 	} else if request.Method == "POST" {
 		request.ParseMultipartForm(a.Config.Server.MaxUploadSize)
 
