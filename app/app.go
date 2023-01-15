@@ -239,17 +239,12 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	if request.Method == "GET" {
 		a.renderUploadPage(respWriter)
 	} else if request.Method == "POST" {
+
+		// The number here is probably used in the wrong place.
+		// Why should we expect tube to fit all uploads into memory?
 		request.ParseMultipartForm(a.Config.Server.MaxUploadSize)
 
-		fileContentFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
-		if err != nil {
-			err := fmt.Errorf("error processing form: %w", err)
-			log.Error(err)
-			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer fileContentFromUpload.Close()
-
+		// get information from the upload form and make sure it is valid
 		videoTitleFromUpload := request.FormValue("video_title")
 		videoDescriptionFromUpload := request.FormValue("video_description")
 		if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
@@ -259,6 +254,18 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		}
 		targetLibraryPath := request.FormValue("target_library_path")
 
+		// save uploaded data in upload directory
+		fileContentFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
+		if err != nil {
+			err := fmt.Errorf("error processing form: %w", err)
+			log.Error(err)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer fileContentFromUpload.Close()
+
+		// keeping the file extension from the upload file probably makes it easier for ffmpeg to
+		// read the file for transcoding later
 		uploadedFile, err := ioutil.TempFile(
 			a.Config.Server.UploadPath,
 			fmt.Sprintf("tube-upload-*%s", filepath.Ext(fileHeaderFromUpload.Filename)),
@@ -279,6 +286,8 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			return
 		}
 
+
+		// create temporary file for transcoded video file
 		temporaryTranscodedFile, err := ioutil.TempFile(
 			a.Config.Server.UploadPath,
 			fmt.Sprintf("tube-transcode-*.mp4"),
@@ -292,6 +301,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 
 		// Here we set the final filename for the video file after transcoding.
 		var newVideoAbsolutePath string
+
 		if a.Config.Server.PreserveUploadFilename ||
 		   a.Library.Paths[targetLibraryPath].PreserveUploadFilename {
 			newVideoAbsolutePath, err = securejoin.SecureJoin(
@@ -332,10 +342,11 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			log.Warn("Using filename '" + newVideoAbsolutePath + "' instead.");
 		}
 
-
 		temporaryTranscodedFileThumbnailPath := fmt.Sprintf("%s.jpg", strings.TrimSuffix(temporaryTranscodedFile.Name(), filepath.Ext(temporaryTranscodedFile.Name())))
 		newVideoAbsoluteThumbnailPath := fmt.Sprintf("%s.jpg", strings.TrimSuffix(newVideoAbsolutePath, filepath.Ext(newVideoAbsolutePath)))
 
+
+		// run the transcoder
 		// TODO: Use a proper Job Queue and make this async
 		if err := utils.RunCmd(
 			a.Config.Transcoder.Timeout,
@@ -356,6 +367,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			return
 		}
 
+		// Create the thumbnail
 		if err := utils.RunCmd(
 			a.Config.Thumbnailer.Timeout,
 			"ffmpeg",
@@ -374,13 +386,15 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			return
 		}
 
+		// move transcoded video file and the thumbnail to its final destination
+		// in the library. move thumbnail first, so that a thumbnail is found
+		// when the library path watcher triggers the addition of that new file
 		if err := os.Rename(temporaryTranscodedFileThumbnailPath, newVideoAbsoluteThumbnailPath); err != nil {
 			err := fmt.Errorf("error renaming generated thumbnail: %w", err)
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		if err := os.Rename(temporaryTranscodedFile.Name(), newVideoAbsolutePath); err != nil {
 			err := fmt.Errorf("error renaming transcoded video: %w", err)
 			log.Error(err)
@@ -390,6 +404,10 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 
 		// TODO: Make this a background job
 		// Resize for lower quality options
+		// this seems to be working in the library directly, instead of in the upload directory
+		// so this will trigger a heck of a lot imports until it is done.
+		// scaled transcoded files should definitely be written to the upload directory
+		// and only be moved to the library shelf when they are done.
 		for size, suffix := range a.Config.Transcoder.Sizes {
 			log.
 				WithField("size", size).
