@@ -262,20 +262,21 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		}
 
 		// save uploaded data in upload directory
-		fileContentFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
+		videoContentFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
 		if err != nil {
 			err := fmt.Errorf("error processing form: %w", err)
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer fileContentFromUpload.Close()
+		defer videoContentFromUpload.Close()
+		videoFilenameFromUpload := fileHeaderFromUpload.Filename
 
 		// keeping the file extension from the upload file probably makes it easier for ffmpeg to
 		// read the file for transcoding later
 		uploadedFile, err := ioutil.TempFile(
 			a.Config.Server.UploadPath,
-			fmt.Sprintf("tube-upload-*%s", filepath.Ext(fileHeaderFromUpload.Filename)),
+			fmt.Sprintf("tube-upload-*%s", filepath.Ext(videoFilenameFromUpload)),
 		)
 		if err != nil {
 			err := fmt.Errorf("error creating temporary file for uploading: %w", err)
@@ -285,7 +286,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		}
 		defer os.Remove(uploadedFile.Name())
 
-		_, err = io.Copy(uploadedFile, fileContentFromUpload)
+		_, err = io.Copy(uploadedFile, videoContentFromUpload)
 		if err != nil {
 			err := fmt.Errorf("error writing file: %w", err)
 			log.Error(err)
@@ -313,7 +314,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		   a.Library.Paths[targetLibraryDir].PreserveUploadFilename {
 			newVideoAbsolutePath, err = securejoin.SecureJoin(
 				a.Library.Paths[targetLibraryDir].Path,
-				fmt.Sprintf("%s.mp4", filenameWithoutExtension(fileHeaderFromUpload.Filename)),
+				fmt.Sprintf("%s.mp4", filenameWithoutExtension(videoFilenameFromUpload)),
 			)
 		} else {
 			newVideoAbsolutePath, err = securejoin.SecureJoin(
