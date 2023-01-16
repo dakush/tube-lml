@@ -217,7 +217,16 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Return only the file stem.
+// Removes leading directories and file extension(if there is one)
 func filenameWithoutExtension(path string) (stem string) {
+	var basename string = filepath.Base(path)
+	return basename[0:len(basename)-len(filepath.Ext(basename))]
+}
+
+// Return full path without extension.
+// Keeps leading directories but removes file extension(if there is one)
+func pathWithoutExtension(path string) (stem string) {
 	var basename string = filepath.Base(path)
 	return basename[0:len(basename)-len(filepath.Ext(basename))]
 }
@@ -247,12 +256,10 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		// get information from the upload form and make sure it is valid
 		videoTitleFromUpload := request.FormValue("video_title")
 		videoDescriptionFromUpload := request.FormValue("video_description")
-		if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
-			err := fmt.Errorf("uploading to invalid library path: %s", request.FormValue("target_library_path"))
-			log.Error(err)
+		targetLibraryDir, err := getSelectedTargetLibraryDir(a, request, respWriter)
+		if err != nil {
 			return
 		}
-		targetLibraryPath := request.FormValue("target_library_path")
 
 		// save uploaded data in upload directory
 		fileContentFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
@@ -303,14 +310,14 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		var newVideoAbsolutePath string
 
 		if a.Config.Server.PreserveUploadFilename ||
-		   a.Library.Paths[targetLibraryPath].PreserveUploadFilename {
+		   a.Library.Paths[targetLibraryDir].PreserveUploadFilename {
 			newVideoAbsolutePath, err = securejoin.SecureJoin(
-				a.Library.Paths[targetLibraryPath].Path,
+				a.Library.Paths[targetLibraryDir].Path,
 				fmt.Sprintf("%s.mp4", filenameWithoutExtension(fileHeaderFromUpload.Filename)),
 			)
 		} else {
 			newVideoAbsolutePath, err = securejoin.SecureJoin(
-				a.Library.Paths[targetLibraryPath].Path,
+				a.Library.Paths[targetLibraryDir].Path,
 				fmt.Sprintf("%s.mp4", shortuuid.New()),
 			)
 		}
@@ -328,9 +335,9 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			log.Warn("File '"+ newVideoAbsolutePath + "' already exists.");
+			log.Warn("File '" + newVideoAbsolutePath + "' already exists.");
 			newVideoAbsolutePath, err = securejoin.SecureJoin(
-				a.Library.Paths[targetLibraryPath].Path,
+				a.Library.Paths[targetLibraryDir].Path,
 				fmt.Sprintf("%s_%s.mp4", filenameWithoutExtension(newVideoAbsolutePath), shortuuid.New()),
 			)
 			if err != nil {
@@ -342,8 +349,8 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			log.Warn("Using filename '" + newVideoAbsolutePath + "' instead.");
 		}
 
-		temporaryTranscodedFileThumbnailPath := fmt.Sprintf("%s.jpg", strings.TrimSuffix(temporaryTranscodedFile.Name(), filepath.Ext(temporaryTranscodedFile.Name())))
-		newVideoAbsoluteThumbnailPath := fmt.Sprintf("%s.jpg", strings.TrimSuffix(newVideoAbsolutePath, filepath.Ext(newVideoAbsolutePath)))
+		temporaryTranscodedFileThumbnailPath := fmt.Sprintf("%s.jpg", pathWithoutExtension(temporaryTranscodedFile.Name()))
+		newVideoAbsoluteThumbnailPath := fmt.Sprintf("%s.jpg", pathWithoutExtension(newVideoAbsolutePath))
 
 
 		// run the transcoder
@@ -447,6 +454,16 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	}
 }
 
+func getSelectedTargetLibraryDir(a *App, request *http.Request, respWriter http.ResponseWriter) (targetLibraryDirectory string, err error) {
+	if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
+		err = fmt.Errorf("uploading to invalid library path: %s", request.FormValue("target_library_path"))
+		log.Error(err)
+		http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+		return "", err
+	}
+	return request.FormValue("target_library_path"), nil
+}
+
 // HTTP handler for /import
 func (a *App) importHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -488,7 +505,7 @@ func (a *App) importHandler(w http.ResponseWriter, r *http.Request) {
 
 		videoInfo, err := videoImporter.GetVideoInfo(url)
 		if err != nil {
-			err := fmt.Errorf("error retriving video info for %s: %w", url, err)
+			err := fmt.Errorf("error retrieving video info for %s: %w", url, err)
 			log.Error(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -702,7 +719,7 @@ func (a *App) pageHandler(w http.ResponseWriter, r *http.Request) {
 		media.By(media.SortByTimestamp).Sort(playlist)
 	default:
 		// By default the playlist is sorted by Timestamp
-		log.Warnf("invalid sort critiera: %s", sort)
+		log.WithField("sort", sort).Warn("invalid sort criteria")
 	}
 
 	quality := strings.ToLower(r.URL.Query().Get("quality"))
