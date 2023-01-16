@@ -4,7 +4,7 @@
 
 `tube` is a Youtube-like (_without censorship and features you don't need!_)
 Video Sharing App written in Go which also supports automatic transcoding to
-MP4 H.265 AAC, multiple collections and RSS feed.
+MP4 H.264 AAC, multiple collections and RSS feed.
 
 ## Features
 
@@ -216,6 +216,10 @@ destination for their uploads. Both `prefix` and `path` need to be unique.
     }
 }
 ```
+Transcoding is currently done into am MP4 container with H.264 video codec and AAC audio codec.
+HEVC / H.265 It is easy to add, but due to current browser and mobile device limitation we stick
+with H.264 as default for now. If you want to add H.265 support, we are open for pull requests
+that allow configuring the target codec e.g. via the `transcoder` section in `config.json`.
 
 ### Optionally Require Password for Uploading
 
