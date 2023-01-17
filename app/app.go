@@ -217,20 +217,6 @@ func (a *App) indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Return only the file stem.
-// Removes leading directories and file extension(if there is one)
-func filenameWithoutExtension(path string) (stem string) {
-	var basename string = filepath.Base(path)
-	return basename[0:len(basename)-len(filepath.Ext(basename))]
-}
-
-// Return full path without extension.
-// Keeps leading directories but removes file extension(if there is one)
-func pathWithoutExtension(path string) (stem string) {
-	var basename string = filepath.Base(path)
-	return basename[0:len(basename)-len(filepath.Ext(basename))]
-}
-
 // Render the upload page where clients can select and upload their video files
 func (a *App) renderUploadPage(respWriter http.ResponseWriter) {
 	ctx := &struct {
@@ -262,11 +248,19 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		}
 
 		// save uploaded data in upload directory
-		videoContentFromUpload, videoFilenameFromUpload, err := getUploadedVideoFile(a, request, respWriter)
+		videoContentFromUpload, videoFilenameFromUpload, err := extractFormFile(a, request, respWriter)
 		if err != nil {
 			return
 		}
 		defer videoContentFromUpload.Close()
+
+		// Here we set the basename for the new video file (and make sure there are no collisions)
+		newVideoBasename, err := newVideoFileName(a, videoFilenameFromUpload, []string {targetLibraryDir, a.Config.Server.UploadPath}, respWriter)
+		if err != nil {
+			return
+		}
+
+		newVideoPath := filepath.Join(targetLibraryDir, newVideoBasename)
 
 		// keeping the file extension from the upload file probably makes it easier for ffmpeg to
 		// read the file for transcoding later
@@ -277,66 +271,40 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		defer os.Remove(uploadedFile.Name())
 
 		// create temporary file for transcoded video file
-		temporaryTranscodedFile, err := ioutil.TempFile(
-			a.Config.Server.UploadPath,
-			fmt.Sprintf("tube-transcode-*.mp4"),
-		)
+		transcodedVideoPath, err := getTranscodedPath(a, newVideoBasename, respWriter)
+		if err != nil {
+			return
+		}
+
+		transcodedVideoFile, err := os.Create(transcodedVideoPath)
 		if err != nil {
 			err := fmt.Errorf("error creating temporary file for transcoding: %w", err)
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		transcodedVideoFile.Chmod(0o644)
+		defer os.Remove(transcodedVideoFile.Name())
+		// close now or defer?
 
-		// Here we set the final filename for the video file after transcoding.
-		var newVideoAbsolutePath string
+		log.WithFields(log.Fields{
+			"videoTitleFromUpload": videoTitleFromUpload,
+			"videoDescriptionFromUpload": videoDescriptionFromUpload,
+			"targetLibraryDir": targetLibraryDir,
+			"videoContentFromUpload": videoContentFromUpload,
+			"videoFilenameFromUpload": videoFilenameFromUpload,
+			"newVideoBasename": newVideoBasename,
+			"newVideoFullPath": newVideoPath,
+		}).Trace("New upload")
 
-		if a.Config.Server.PreserveUploadFilename ||
-		   a.Library.Paths[targetLibraryDir].PreserveUploadFilename {
-			newVideoAbsolutePath, err = securejoin.SecureJoin(
-				a.Library.Paths[targetLibraryDir].Path,
-				fmt.Sprintf("%s.mp4", filenameWithoutExtension(videoFilenameFromUpload)),
-			)
-		} else {
-			newVideoAbsolutePath, err = securejoin.SecureJoin(
-				a.Library.Paths[targetLibraryDir].Path,
-				fmt.Sprintf("%s.mp4", shortuuid.New()),
-			)
-		}
-		if err != nil {
-			err := fmt.Errorf("error creating file name in target library: %w", err)
-			log.Error(err)
-			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// If the (sanitized) original filename collides with an existing file,
-		// we try to add a shortuuid() to it until we find one that doesn't exist.
-		for _, err := os.Stat(newVideoAbsolutePath) ; ! os.IsNotExist(err) ; _, err = os.Stat(newVideoAbsolutePath) {
-			if err != nil {
-				log.Error(err)
-				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			log.Warn("File '" + newVideoAbsolutePath + "' already exists.");
-			newVideoAbsolutePath, err = securejoin.SecureJoin(
-				a.Library.Paths[targetLibraryDir].Path,
-				fmt.Sprintf("%s_%s.mp4", filenameWithoutExtension(newVideoAbsolutePath), shortuuid.New()),
-			)
-			if err != nil {
-				err := fmt.Errorf("error creating file name in target library: %w", err)
-				log.Error(err)
-				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			log.Warn("Using filename '" + newVideoAbsolutePath + "' instead.");
-		}
-
-		temporaryTranscodedFileThumbnailPath := fmt.Sprintf("%s.jpg", pathWithoutExtension(temporaryTranscodedFile.Name()))
-		newVideoAbsoluteThumbnailPath := fmt.Sprintf("%s.jpg", pathWithoutExtension(newVideoAbsolutePath))
+		transcodedThumbnailPath := fmt.Sprintf("%s.jpg", pathWithoutExtension(transcodedVideoFile.Name()))
+		newThumbnailPath := fmt.Sprintf("%s.jpg", pathWithoutExtension(newVideoPath))
 
 
 		// run the transcoder
 		// TODO: Use a proper Job Queue and make this async
+		log.Debugf("Running transcoder for video %s to %s", uploadedFile.Name(), transcodedVideoFile.Name())
+
 		if err := utils.RunCmd(
 			a.Config.Transcoder.Timeout,
 			"ffmpeg",
@@ -348,7 +316,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			"-loglevel", "quiet",
 			"-metadata", fmt.Sprintf("title=%s", videoTitleFromUpload),
 			"-metadata", fmt.Sprintf("comment=%s", videoDescriptionFromUpload),
-			temporaryTranscodedFile.Name(),
+			transcodedVideoFile.Name(),
 		); err != nil {
 			err := fmt.Errorf("error transcoding video: %w", err)
 			log.Error(err)
@@ -356,6 +324,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			return
 		}
 
+		log.Debugf("Running transcoder for thumbnail %s to %s", uploadedFile.Name(), transcodedThumbnailPath)
 		// Create the thumbnail
 		if err := utils.RunCmd(
 			a.Config.Thumbnailer.Timeout,
@@ -367,7 +336,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 			"-vframes", "1",
 			"-strict", "-2",
 			"-loglevel", "quiet",
-			temporaryTranscodedFileThumbnailPath,
+			transcodedThumbnailPath,
 		); err != nil {
 			err := fmt.Errorf("error generating thumbnail: %w", err)
 			log.Error(err)
@@ -378,13 +347,15 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		// move transcoded video file and the thumbnail to its final destination
 		// in the library. move thumbnail first, so that a thumbnail is found
 		// when the library path watcher triggers the addition of that new file
-		if err := os.Rename(temporaryTranscodedFileThumbnailPath, newVideoAbsoluteThumbnailPath); err != nil {
+		log.Debugf("Moving %s to %s", transcodedThumbnailPath, newThumbnailPath)
+		if err := os.Rename(transcodedThumbnailPath, newThumbnailPath); err != nil {
 			err := fmt.Errorf("error renaming generated thumbnail: %w", err)
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if err := os.Rename(temporaryTranscodedFile.Name(), newVideoAbsolutePath); err != nil {
+		log.Debugf("Moving %s to %s", transcodedVideoFile.Name(), newVideoPath)
+		if err := os.Rename(transcodedVideoFile.Name(), newVideoPath); err != nil {
 			err := fmt.Errorf("error renaming transcoded video: %w", err)
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
@@ -400,11 +371,11 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		for size, suffix := range a.Config.Transcoder.Sizes {
 			log.
 				WithField("size", size).
-				WithField("vf", filepath.Base(newVideoAbsolutePath)).
+				WithField("vf", filepath.Base(newVideoPath)).
 				Info("resizing video for lower quality playback")
 			sf := fmt.Sprintf(
 				"%s#%s.mp4",
-				strings.TrimSuffix(newVideoAbsolutePath, filepath.Ext(newVideoAbsolutePath)),
+				strings.TrimSuffix(newVideoPath, filepath.Ext(newVideoPath)),
 				suffix,
 			)
 
@@ -412,7 +383,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 				a.Config.Transcoder.Timeout,
 				"ffmpeg",
 				"-y",
-				"-i", newVideoAbsolutePath,
+				"-i", newVideoPath,
 				"-s", size,
 				"-c:v", "libx264",
 				"-c:a", "aac",
@@ -436,7 +407,102 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	}
 }
 
-// Copies the data from the upload form to a temporary file in the
+func getTranscodedPath(a *App, newVideoBasename string, respWriter http.ResponseWriter) (transcodedFileAbsoluePath string, err error) {
+	transcodedFileAbsolutePath, err := securejoin.SecureJoin(
+		a.Config.Server.UploadPath,
+		newVideoBasename)
+	if err != nil {
+		err := fmt.Errorf("error creating temporary filename for transcoding: %w", err)
+		log.Error(err)
+		http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+		return "", err
+	}
+	return transcodedFileAbsolutePath, nil
+}
+
+func preserveUploadFilenameIsEnabled(a *App, targetLibraryDir string) (bool) {
+	return a.Config.Server.PreserveUploadFilename ||
+		a.Library.Paths[targetLibraryDir].PreserveUploadFilename
+}
+
+// return "true, nil" , if exists
+// false, nil if it doesn't exist
+// false, err if something went wrong, like path getting too long
+// this checks simple os.stat existence for now, but will check
+// other supported backends later
+func fileExistsAtLocation(filename string, location string) (exists bool, err error) {
+    var absolutePath string
+	absolutePath, err = securejoin.SecureJoin(location, filename)
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(absolutePath);
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+// checks the list of locations and returns true,nil if filename exists in at least one.
+func fileExistsAtAnyLocation(filename string, locations []string) (exists bool, err error) {
+	for _, loc := range locations {
+		exists, err = fileExistsAtLocation(filename, loc)
+		if err != nil {
+			return false, err
+		}
+		if exists && err == nil {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// newVideoFileName takes a candidate filename, and returns a name that
+// does not exist in any of the given locations.
+// If the candidate is empty or exists in any location, newVideoFilename
+// adds a shortuuid to make it unique.
+func newVideoFileName(a *App, candidateFilename string, locationsToCheckForCollisions []string, respWriter http.ResponseWriter) (newFileName string, err error) {
+	if candidateFilename != "" {
+		newFileName = fmt.Sprintf("%s.mp4", basenameWithoutExtension(candidateFilename))
+	} else {
+		newFileName = fmt.Sprintf("%s.mp4", shortuuid.New())
+	}
+	for exists, err := fileExistsAtAnyLocation(newFileName, locationsToCheckForCollisions) ;
+		exists == true && err == nil ;
+		exists, err = fileExistsAtAnyLocation(newFileName, locationsToCheckForCollisions) {
+		if err != nil {
+			log.Error(err)
+			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+			return "", err
+		}
+		log.Warn("File '" + newFileName + "' already exists.")
+		newFileName = fmt.Sprintf("%s_%s.mp4", basenameWithoutExtension(candidateFilename), shortuuid.New())
+		log.Warn("Using filename '" + newFileName + "' instead.")
+	}
+	if err != nil {
+		return "", err
+	}
+	return newFileName, nil
+}
+
+
+// basenameWithoutExtension works similarly to the basename command.
+// It removes leading directories and the file extension(if there is one)
+func basenameWithoutExtension(path string) (stem string) {
+	var basename string = filepath.Base(path)
+	return basename[0:len(basename)-len(filepath.Ext(basename))]
+}
+
+// Return full path without extension.
+// Keeps leading directories but removes file extension(if there is one)
+func pathWithoutExtension(path string) (stem string) {
+	return path[0:len(path)-len(filepath.Ext(path))]
+}
+
+// Takes the data from the upload form to a temporary file in the
 // upload_dir of our server. Returns a *os.File handle on that file
 // or an error in err
 func copyFileFromFormToUploadDir(
@@ -465,7 +531,7 @@ func copyFileFromFormToUploadDir(
 	return uploadedFile, nil
 }
 
-func getUploadedVideoFile(
+func extractFormFile(
 	a *App, request *http.Request, respWriter http.ResponseWriter) (
 		fileReader io.ReadCloser, fileName string, err error) {
 	fileReader, fileHeaderFromUpload, err := request.FormFile("video_file")
