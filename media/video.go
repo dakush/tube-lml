@@ -3,7 +3,6 @@ package media
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -11,7 +10,9 @@ import (
 	"time"
 
 	"git.mills.io/prologic/tube/utils"
+
 	"github.com/dhowden/tag"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -47,7 +48,7 @@ func getTagsFromYml(v *Video) error {
 		return err
 	}
 
-	log.Println("Got tags from yml for", v.Path)
+	log.Debugf("Got tags from yml for %s", v.Path)
 	return nil
 }
 
@@ -98,7 +99,7 @@ func ParseVideo(p *Path, name string) (*Video, error) {
 	// read yml if exists
 	err = getTagsFromYml(v)
 	if err != nil {
-		log.Println("Failed to read yml for", v.Path)
+		log.Warnf("Failed to read yml for %s", v.Path)
 	}
 
 	// Add thumbnail from embedded tags (if exists)
@@ -112,7 +113,7 @@ func ParseVideo(p *Path, name string) (*Video, error) {
 	if utils.FileExists(fmt.Sprintf("%s.jpg", strings.TrimSuffix(pth, filepath.Ext(pth)))) {
 		data, err := ioutil.ReadFile(fmt.Sprintf("%s.jpg", strings.TrimSuffix(pth, filepath.Ext(pth))))
 		if err != nil {
-			log.Println("Failed to read thumbnail file for", v.Path)
+			log.Errorf("Failed to read thumbnail file for %s", v.Path)
 			return nil, err
 		}
 		v.Thumb = data
