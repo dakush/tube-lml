@@ -262,15 +262,11 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		}
 
 		// save uploaded data in upload directory
-		videoContentFromUpload, fileHeaderFromUpload, err := request.FormFile("video_file")
+		videoContentFromUpload, videoFilenameFromUpload, err := getUploadedVideoFile(a, request, respWriter)
 		if err != nil {
-			err := fmt.Errorf("error processing form: %w", err)
-			log.Error(err)
-			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer videoContentFromUpload.Close()
-		videoFilenameFromUpload := fileHeaderFromUpload.Filename
 
 		// keeping the file extension from the upload file probably makes it easier for ffmpeg to
 		// read the file for transcoding later
@@ -455,6 +451,18 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	}
 }
 
+func getUploadedVideoFile(a *App, request *http.Request, respWriter http.ResponseWriter) (fileReader io.ReadCloser, fileName string, err error) {
+	fileReader, fileHeaderFromUpload, err := request.FormFile("video_file")
+	if err != nil {
+		err := fmt.Errorf("error processing form: %w", err)
+		log.Error(err)
+		http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+		return nil, "", err
+	}
+	fileName = fileHeaderFromUpload.Filename
+	return
+}
+
 func getSelectedTargetLibraryDir(a *App, request *http.Request, respWriter http.ResponseWriter) (targetLibraryDirectory string, err error) {
 	if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
 		err = fmt.Errorf("uploading to invalid library path: %s", request.FormValue("target_library_path"))
@@ -462,7 +470,8 @@ func getSelectedTargetLibraryDir(a *App, request *http.Request, respWriter http.
 		http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 		return "", err
 	}
-	return request.FormValue("target_library_path"), nil
+	targetLibraryDirectory = request.FormValue("target_library_path")
+	return
 }
 
 // HTTP handler for /import
