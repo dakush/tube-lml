@@ -270,26 +270,11 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 
 		// keeping the file extension from the upload file probably makes it easier for ffmpeg to
 		// read the file for transcoding later
-		uploadedFile, err := ioutil.TempFile(
-			a.Config.Server.UploadPath,
-			fmt.Sprintf("tube-upload-*%s", filepath.Ext(videoFilenameFromUpload)),
-		)
+		uploadedFile, err := copyFileFromFormToUploadDir(a, videoContentFromUpload, videoFilenameFromUpload, respWriter)
 		if err != nil {
-			err := fmt.Errorf("error creating temporary file for uploading: %w", err)
-			log.Error(err)
-			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		defer os.Remove(uploadedFile.Name())
-
-		_, err = io.Copy(uploadedFile, videoContentFromUpload)
-		if err != nil {
-			err := fmt.Errorf("error writing file: %w", err)
-			log.Error(err)
-			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
 
 		// create temporary file for transcoded video file
 		temporaryTranscodedFile, err := ioutil.TempFile(
@@ -451,7 +436,38 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	}
 }
 
-func getUploadedVideoFile(a *App, request *http.Request, respWriter http.ResponseWriter) (fileReader io.ReadCloser, fileName string, err error) {
+// Copies the data from the upload form to a temporary file in the
+// upload_dir of our server. Returns a *os.File handle on that file
+// or an error in err
+func copyFileFromFormToUploadDir(
+	a *App, videoContentFromUpload io.ReadCloser, videoFilenameFromUpload string,
+	respWriter http.ResponseWriter) (
+		uploadedFile *os.File, err error) {
+
+	uploadedFile, err = ioutil.TempFile(
+		a.Config.Server.UploadPath,
+		fmt.Sprintf("tube-upload-*%s", filepath.Ext(videoFilenameFromUpload)),
+	)
+	if err != nil {
+		err := fmt.Errorf("error creating temporary file for uploading: %w", err)
+		log.Error(err)
+		http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+		return nil, err
+	}
+
+	_, err = io.Copy(uploadedFile, videoContentFromUpload)
+	if err != nil {
+		err := fmt.Errorf("error writing file: %w", err)
+		log.Error(err)
+		http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+		return nil, err
+	}
+	return uploadedFile, nil
+}
+
+func getUploadedVideoFile(
+	a *App, request *http.Request, respWriter http.ResponseWriter) (
+		fileReader io.ReadCloser, fileName string, err error) {
 	fileReader, fileHeaderFromUpload, err := request.FormFile("video_file")
 	if err != nil {
 		err := fmt.Errorf("error processing form: %w", err)
@@ -463,7 +479,12 @@ func getUploadedVideoFile(a *App, request *http.Request, respWriter http.Respons
 	return
 }
 
-func getSelectedTargetLibraryDir(a *App, request *http.Request, respWriter http.ResponseWriter) (targetLibraryDirectory string, err error) {
+// infer the location where the uploaded and transcode video shall be stored
+// for now this is a directory, but in the future we will return a library
+// location that could point to a different type, like an s3 bucket.
+func getSelectedTargetLibraryDir(
+	a *App, request *http.Request, respWriter http.ResponseWriter) (
+		targetLibraryDirectory string, err error) {
 	if _, exists := a.Library.Paths[request.FormValue("target_library_path")]; !exists {
 		err = fmt.Errorf("uploading to invalid library path: %s", request.FormValue("target_library_path"))
 		log.Error(err)
