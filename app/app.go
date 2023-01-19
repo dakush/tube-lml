@@ -303,42 +303,22 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 
 		// run the transcoder
 		// TODO: Use a proper Job Queue and make this async
-		log.Debugf("Running transcoder for video %s to %s", uploadedFile.Name(), transcodedVideoFile.Name())
-
-		if err := utils.RunCmd(
+		_, err = createVideo(
+			uploadedFile.Name(), transcodedVideoPath,
 			a.Config.Transcoder.Timeout,
-			"ffmpeg",
-			"-y",
-			"-i", uploadedFile.Name(),
-			"-vcodec", "h264",
-			"-acodec", "aac",
-			"-strict", "-2",
-			"-loglevel", "quiet",
-			"-metadata", fmt.Sprintf("title=%s", videoTitleFromUpload),
-			"-metadata", fmt.Sprintf("comment=%s", videoDescriptionFromUpload),
-			transcodedVideoFile.Name(),
-		); err != nil {
-			err := fmt.Errorf("error transcoding video: %w", err)
+			videoTitleFromUpload, videoDescriptionFromUpload)
+		if err != nil {
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		log.Debugf("Running transcoder for thumbnail %s to %s", uploadedFile.Name(), transcodedThumbnailPath)
 		// Create the thumbnail
-		if err := utils.RunCmd(
+		_, err = createThumbnail(
+			uploadedFile.Name(), transcodedThumbnailPath,
 			a.Config.Thumbnailer.Timeout,
-			"ffmpeg",
-			"-i", uploadedFile.Name(),
-			"-y",
-			"-vf", "thumbnail",
-			"-t", fmt.Sprint(a.Config.Thumbnailer.PositionFromStart),
-			"-vframes", "1",
-			"-strict", "-2",
-			"-loglevel", "quiet",
-			transcodedThumbnailPath,
-		); err != nil {
-			err := fmt.Errorf("error generating thumbnail: %w", err)
+			a.Config.Thumbnailer.PositionFromStart)
+		if err != nil {
 			log.Error(err)
 			http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 			return
@@ -405,6 +385,55 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	} else {
 		http.Error(respWriter, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func createVideo(videoFile string, transcodedVideoPath string,
+	timeout int, videoTitle, videoDescription string) (ok bool, err error) {
+
+	log.Debugf("Running transcoder for video %s to %s", videoFile, transcodedVideoPath)
+
+	if err := utils.RunCmd(
+		timeout,
+		"ffmpeg",
+		"-y",
+		"-i", videoFile,
+		"-vcodec", "h264",
+		"-acodec", "aac",
+		"-strict", "-2",
+		"-loglevel", "quiet",
+		"-metadata", fmt.Sprintf("title=%s", videoTitle),
+		"-metadata", fmt.Sprintf("comment=%s", videoDescription),
+		transcodedVideoPath,
+	); err != nil {
+		err := fmt.Errorf("error transcoding video: %w", err)
+		return false, err
+	}
+	return true, nil
+}
+
+// createThumbnail creates an image at thumbnailPath looking secondsFromStart
+// into the videoFile.
+func createThumbnail(videoFile string, thumbnailPath string,
+	timeout, secondsFromStart int) (ok bool, err error) {
+
+	log.Debugf("Running transcoder for thumbnail %s to %s", videoFile, thumbnailPath)
+
+	if err := utils.RunCmd(
+		timeout,
+		"ffmpeg",
+		"-i", videoFile,
+		"-y",
+		"-vf", "thumbnail",
+		"-t", fmt.Sprint(secondsFromStart),
+		"-vframes", "1",
+		"-strict", "-2",
+		"-loglevel", "quiet",
+		thumbnailPath,
+	); err != nil {
+		err := fmt.Errorf("error generating thumbnail: %w", err)
+		return false, err
+	}
+	return true, nil
 }
 
 func getTranscodedPath(a *App, newVideoBasename string, respWriter http.ResponseWriter) (transcodedFileAbsoluePath string, err error) {
