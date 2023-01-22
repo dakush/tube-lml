@@ -4,6 +4,24 @@
 
 ### Bug Fixes
 
+* Fix initial rendering of import page
+* Clarify documentation regarding H.264 vs H.265
+* Warn about creation of upload and library directories
+* Warn about missing config file
+
+### Features
+
+* Allow selection of upload path by `prefix`
+* Read meta data (title, description) from `.yml` files
+* Add `preserve_upload_filename` option
+* Allow optional authentication for video upload
+* Add `position_from_start` to replace hardcoded 3 seconds in thumbnailer
+
+### Updates / Build / Development
+
+* Add Drone CI
+* Add Sandstorm packaging files (#26)
+* Update deps
 * Fix GoReleaser config
 * Fix GoReleaser config
 * Fix (refix) Dockerfile
@@ -13,15 +31,8 @@
 * Fix Docker image build
 * Fix CI
 * Fix image target to build multi-arch images to the Docker Hub
-
-### Features
-
-* Add Drone CI
-* Add Sandstorm packaging files (#26)
-
-### Updates
-
-* Update deps
+* Fix build preflight checks to accept go 1.19
+* Remove dependencies on FontAwesome and rice box
 
 ### Note
 
