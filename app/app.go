@@ -42,6 +42,9 @@ type App struct {
 	Router    *mux.Router
 }
 
+// 1MB buffer in RAM seems enough
+const uploadParserBuffer = 1_048_576
+
 // NewApp returns a new instance of App from Config.
 func NewApp(cfg *Config) (*App, error) {
 	if cfg == nil {
@@ -235,9 +238,7 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 		a.renderUploadPage(respWriter)
 	} else if request.Method == "POST" {
 
-		// The number here is probably used in the wrong place.
-		// Why should we expect tube to fit all uploads into memory?
-		request.ParseMultipartForm(a.Config.Server.MaxUploadSize)
+		request.ParseMultipartForm(uploadParserBuffer)
 
 		// get information from the upload form and make sure it is valid
 		videoTitleFromUpload := request.FormValue("video_title")
