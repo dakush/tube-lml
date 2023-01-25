@@ -39,7 +39,8 @@ Please note that all pull requests will be squashed before merging. This means t
 
 ## Code of Conduct
 
-Please note that this project is released with a [Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
+This project does not have a written code of conduct. Be nice to each other!
+If you need further instructions ask your parents or the Dalai Lama. ;-)
 
 ## Thank you
 
