@@ -7,7 +7,7 @@ The best way to make those things happen, is to actually do them.
 
 - refactor [uploadHandler](https://git.mills.io/prologic/tube/src/commit/c0ca374a16a75acbf380b133dde6529d7f66bb2b/app/app.go#L226)
 - extract hardcoded ffmpeg parameters into config.json
-- Add ability to override `config.json` config via env variables. This would make a containerized version of tube much easier to deploy.
+- Add ability to override `config.json` configuration via env variables. This would make a containerized version of tube much easier to deploy.
 
 ## Unsorted
 
