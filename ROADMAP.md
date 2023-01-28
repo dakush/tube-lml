@@ -3,9 +3,16 @@
 This is mostly a collection of ideas and wishes.
 The best way to make those things happen, is to actually do them.
 
-## Prioritized
+If you want to start working on any of those features, please take
+a look at the [contributing guidelines](CONTRIBUTING.md) and open
+an issue to let us know and to discuss the details.
+
+## In Progress
 
 - refactor [uploadHandler](https://git.mills.io/prologic/tube/src/commit/c0ca374a16a75acbf380b133dde6529d7f66bb2b/app/app.go#L226)
+
+## Prioritized
+
 - extract hardcoded ffmpeg parameters into config.json
 - Add ability to override `config.json` configuration via env variables. This would make a containerized version of tube much easier to deploy.
 
