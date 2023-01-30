@@ -345,37 +345,34 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 
 		// TODO: Make this a background job
 		// Resize for lower quality options
-		// this seems to be working in the library directly, instead of in the upload directory
-		// so this will trigger a heck of a lot imports until it is done.
-		// scaled transcoded files should definitely be written to the upload directory
-		// and only be moved to the library shelf when they are done.
 		for size, suffix := range a.Config.Transcoder.Sizes {
 			log.
 				WithField("size", size).
-				WithField("vf", filepath.Base(newVideoPath)).
+				WithField("vf", filepath.Base(uploadedFile.Name())).
 				Info("resizing video for lower quality playback")
-			sf := fmt.Sprintf(
+			scaledFileName := fmt.Sprintf(
+				"%s#%s.mp4",
+				strings.TrimSuffix(transcodedVideoPath, filepath.Ext(transcodedVideoPath)),
+				suffix,
+			)
+			_, err = createScaledVideo(
+				uploadedFile.Name(), scaledFileName,
+				a.Config.Transcoder.Timeout,
+				videoTitleFromUpload, videoDescriptionFromUpload,
+			    size)
+			if err != nil {
+				log.Error(err)
+				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			targetFilename := fmt.Sprintf(
 				"%s#%s.mp4",
 				strings.TrimSuffix(newVideoPath, filepath.Ext(newVideoPath)),
 				suffix,
 			)
-
-			if err := utils.RunCmd(
-				a.Config.Transcoder.Timeout,
-				"ffmpeg",
-				"-y",
-				"-i", newVideoPath,
-				"-s", size,
-				"-c:v", "libx264",
-				"-c:a", "aac",
-				"-crf", "18",
-				"-strict", "-2",
-				"-loglevel", "quiet",
-				"-metadata", fmt.Sprintf("title=%s", videoTitleFromUpload),
-				"-metadata", fmt.Sprintf("comment=%s", videoDescriptionFromUpload),
-				sf,
-			); err != nil {
-				err := fmt.Errorf("error transcoding video: %w", err)
+			log.Debugf("Moving %s to %s", scaledFileName, targetFilename)
+			if err := os.Rename(scaledFileName, targetFilename); err != nil {
+				err := fmt.Errorf("error moving scaled video: %w", err)
 				log.Error(err)
 				http.Error(respWriter, err.Error(), http.StatusInternalServerError)
 				return
@@ -386,6 +383,32 @@ func (a *App) uploadHandler(respWriter http.ResponseWriter, request *http.Reques
 	} else {
 		http.Error(respWriter, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func createScaledVideo(videoFile string, scaledVideoFile string,
+	timeout int,
+	videoTitle string, videoDescription string,
+	size string) (ok bool, err error) {
+
+	if err := utils.RunCmd(
+		timeout,
+		"ffmpeg",
+		"-y",
+		"-i", videoFile,
+		"-s", size,
+		"-c:v", "libx264",
+		"-c:a", "aac",
+		"-crf", "18",
+		"-strict", "-2",
+		"-loglevel", "verbose",
+		"-metadata", fmt.Sprintf("title=%s", videoTitle),
+		"-metadata", fmt.Sprintf("comment=%s", videoDescription),
+		scaledVideoFile,
+	); err != nil {
+		err := fmt.Errorf("error transcoding video: %w", err)
+		return false, err
+	}
+	return true, nil
 }
 
 func createVideo(videoFile string, transcodedVideoPath string,
