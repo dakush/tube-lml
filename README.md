@@ -199,10 +199,16 @@ destination for their uploads. Both `prefix` and `path` need to be unique.
   and/or hog system resources. The thumbnailer and transcoder processes will
   be killed if their execution time exceeds these values.
 
-- Set `sizes` to an map of `size` => `suffix` that you wish to support for
+- Set `sizes` to a map of `size` => `suffix` that you wish to support for
   transcoding videos to lower quality on Upload/Import. This is especially
   useful for serving up videos to users that have poor bandwidth or where
-  data charges are high for them. The following is a valid map:
+  data charges are high for them.
+  The possible `suffix` parts are currently hard coded in several places, so
+  you can use those but you can't make up any new ones.
+  The `size` part can be set explicitly by X- by Y-dimensions with `x` as
+  separator like `320x200` or `1280x720`. There are also a lot of
+  [named size presets](https://ffmpeg.org/ffmpeg-utils.html#video-size-syntax)
+  The following is a valid map:
 
 ```#!json
 {
