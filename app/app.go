@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -918,6 +919,7 @@ func (a *App) videoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var videoPath string
+	var otf bool
 
 	quality := strings.ToLower(r.URL.Query().Get("quality"))
 	switch quality {
@@ -931,8 +933,8 @@ func (a *App) videoHandler(w http.ResponseWriter, r *http.Request) {
 			log.
 				WithField("quality", quality).
 				WithField("videoPath", videoPath).
-				Warn("video with specified quality does not exist (defaulting to default quality)")
-			videoPath = m.Path
+				Warn("video with specified quality does not exist (defaulting to on the fly encoding)")
+			otf = true
 		}
 	case "":
 		videoPath = m.Path
@@ -955,7 +957,74 @@ func (a *App) videoHandler(w http.ResponseWriter, r *http.Request) {
 	disposition := "attachment; filename=\"" + title + ".mp4\""
 	w.Header().Set("Content-Disposition", disposition)
 	w.Header().Set("Content-Type", "video/mp4")
-	http.ServeFile(w, r, videoPath)
+	if otf {
+		log.
+			WithField("videoPath", videoPath).
+			Warn("on the fly encoding")
+		cmd := exec.Command("ffmpeg",
+			"-y",
+			"-s", "320x200",
+			"-vcodec", "h264",
+			"-acodec", "aac",
+			"-strict", "-2",
+			"-loglevel", "debug",
+			"-i", videoPath,
+			"-f", "mp4",
+			"-movflags", "frag_keyframe+empty_moov", "-")
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			http.Error(w, "error creating stderr pipe", http.StatusInternalServerError)
+			return
+		}
+		io.Copy(os.Stdout, stderr)
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			http.Error(w, "error creating stdout pipe", http.StatusInternalServerError)
+			return
+		}
+		if err := cmd.Start(); err != nil {
+			http.Error(w, "error starting ffmpeg", http.StatusInternalServerError)
+			return
+		}
+		defer cmd.Process.Kill()
+
+		go func() {
+			stderrBuf := make([]byte, 1024)
+			for {
+				n, err := stderr.Read(stderrBuf)
+				if n == 0 {
+					break
+				}
+				if err != nil && err != io.EOF {
+					log.Printf("error reading from ffmpeg stderr: %v", err)
+					return
+				}
+				log.Printf("ffmpeg stderr: %s", string(stderrBuf[:n]))
+			}
+		}()
+
+		w.Header().Set("Content-Type", "video/mp4")
+		buf := make([]byte, 1024)
+		for {
+			n, err := stdout.Read(buf)
+			if n == 0 {
+				break
+			}
+			if err != nil && err != io.EOF {
+				http.Error(w, "error reading from ffmpeg stdout", http.StatusInternalServerError)
+				return
+			}
+			if _, err := w.Write(buf[:n]); err != nil {
+				http.Error(w, "error writing to response", http.StatusInternalServerError)
+				return
+			}
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	} else {
+		http.ServeFile(w, r, videoPath)
+	}
 }
 
 // HTTP handler for /t/id
