@@ -394,7 +394,6 @@ func createScaledVideo(videoFile string, scaledVideoFile string,
 		timeout,
 		"ffmpeg",
 		"-y",
-		"-i", videoFile,
 		"-s", size,
 		"-c:v", "libx264",
 		"-c:a", "aac",
@@ -403,6 +402,7 @@ func createScaledVideo(videoFile string, scaledVideoFile string,
 		"-loglevel", "verbose",
 		"-metadata", fmt.Sprintf("title=%s", videoTitle),
 		"-metadata", fmt.Sprintf("comment=%s", videoDescription),
+		"-i", videoFile,
 		scaledVideoFile,
 	); err != nil {
 		err := fmt.Errorf("error transcoding video: %w", err)
@@ -420,13 +420,13 @@ func createVideo(videoFile string, transcodedVideoPath string,
 		timeout,
 		"ffmpeg",
 		"-y",
-		"-i", videoFile,
 		"-vcodec", "h264",
 		"-acodec", "aac",
 		"-strict", "-2",
 		"-loglevel", "quiet",
 		"-metadata", fmt.Sprintf("title=%s", videoTitle),
 		"-metadata", fmt.Sprintf("comment=%s", videoDescription),
+		"-i", videoFile,
 		transcodedVideoPath,
 	); err != nil {
 		err := fmt.Errorf("error transcoding video: %w", err)
@@ -445,13 +445,13 @@ func createThumbnail(videoFile string, thumbnailPath string,
 	if err := utils.RunCmd(
 		timeout,
 		"ffmpeg",
-		"-i", videoFile,
 		"-y",
 		"-vf", "thumbnail",
 		"-t", fmt.Sprint(secondsFromStart),
 		"-vframes", "1",
 		"-strict", "-2",
 		"-loglevel", "quiet",
+		"-i", videoFile,
 		thumbnailPath,
 	); err != nil {
 		err := fmt.Errorf("error generating thumbnail: %w", err)
@@ -906,7 +906,10 @@ func (a *App) videoHandler(w http.ResponseWriter, r *http.Request) {
 	if ok {
 		id = path.Join(prefix, id)
 	}
-
+	log.
+		WithField("Method", r.Method).
+		WithField("RequestURI", r.URL).
+		Debug(r)
 	log.Printf("/v/%s", id)
 
 	m, ok := a.Library.Videos[id]
