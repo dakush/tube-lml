@@ -557,3 +557,50 @@ footer p a:hover {
   display: block;
   text-align: left;
 }
+
+/* Alert styles */
+
+alert {
+  /*  grid-area: alert;*/
+  /*  display: flex;*/
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.5rem;
+  text-align: center;
+  font-weight: bold;
+  color: white;
+  align-items: center;
+  justify-content: center;
+  /*  border-radius: var(--border-radius);*/
+}
+
+alert a {
+  color: white;
+  text-decoration: underline;
+}
+
+alert.float {
+  top: 0;
+  left: 0;
+  /*  position: fixed;*/
+  position: sticky;
+  z-index: 9999;
+}
+
+
+alert.safe {
+  background-color: #4f8811;
+}
+
+alert.warn {
+  background-color: #ff5500;
+}
+
+alert.panic {
+  background-color: #ee1515;
+}
+
+alert.update {
+  background-color: #2986cc;
+}
