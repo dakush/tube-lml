@@ -26,8 +26,8 @@
 <div id="playlist">
   <div class="nav">
     <ul>
-      <li><a {{ if or (eq $.Sort "timestamp") (eq $.Sort "") }}class="active"{{ end }} href="?sort=timestamp">Recent</a></li>
-      <li><a {{ if eq $.Sort "views" }}class="active"{{ end }} href="?sort=views">Views</a></li>
+      <li><a {{ if or (eq $.Sort "timestamp") (eq $.Sort "") }}class="active"{{ end }} href="?sort=timestamp">Lista</a></li>
+      <!-- <li><a {{ if eq $.Sort "views" }}class="active"{{ end }} href="?sort=views">Views</a></li> -->
     </ul>
   </div>
   {{ range $m := .Playlist }}
